@@ -1,11 +1,12 @@
 from login import *
+from bottle import run, route
 
 twitter_api=oauth_login()
-
-def twitter_search(t, q, max_results=200, **kw):
+@route('search/<query>')
+def search(t, query, max_results=200, **kw):
 
     
-    search_results = t.search.tweets(q=q, count=100, **kw)
+    search_results = t.search.tweets(q=query, count=100, **kw)
     
     statuses = search_results['statuses']
     
@@ -30,6 +31,7 @@ def twitter_search(t, q, max_results=200, **kw):
             
     return statuses
     
+run(host='localhost',port=8080)
 q='' #enter query here
 
 
