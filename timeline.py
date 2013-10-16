@@ -140,8 +140,8 @@ def harvest_user_timeline(twitter_api, screen_name=None, user_id=None, max_resul
 # Sample usage
 
 twitter_api = login.oauth_login()
-#tweets = harvest_user_timeline(twitter_api, screen_name="_wandeg", \ #                              max_results=200)
-friends=twitter_api.friends.ids(screen_name='_wandeg')
+                            max_results=200)
+friends=twitter_api.friends.ids(screen_name='')
 following=[id for id in following['ids']]
 
 for id in following[7:13]:
