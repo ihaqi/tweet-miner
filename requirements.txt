@@ -1,3 +1,5 @@
 twitter
 bottle
 pymongo
+urllib2
+httplib
