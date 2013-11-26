@@ -42,23 +42,3 @@ def search(t, query, max_results=200, **kw):
     return statuses
     
 run(host='localhost',port=8080)
-q='' #enter query here
-
-
-statuses=twitter_search(twitter_api, q, max_results=10)
-print len(statuses)
-    
-    
-status_texts = [ status['text'] for status in statuses ]
-
-screen_names = [ user_mention['screen_name'] 
-                    for status in statuses
-                        for user_mention in status['entities']['user_mentions'] ]
-
-hashtags = [ hashtag['text'] 
-                 for status in statuses
-                     for hashtag in status['entities']['hashtags'] ]
-
-    # Compute a collection of all words from all tweets
-words = [ w for t in status_texts 
-              for w in t.split() ]
