@@ -160,18 +160,24 @@ def harvest_user_timeline(twitter_api,screen_name=None,user_id=None, max_results
 
 twitter_api=oauth_login()
 tweets =harvest_user_timeline(twitter_api, screen_name='ma3route',max_results=5000)
-tweet_date=[]
 
 for tweet in tweets:
-    tweet_date.append([datetime.strptime(tweet['created_at'],'%a %b %d %H:%M:%S +0000 %Y').date(),tweet['text']])
-
-last_date=tweet_date[0][0]
-first_date=tweet_date[-1][0]
-time_diff=first_date-last_date
-days_diff=time_diff.days
+    tweet['created_at']=strip(tweet['created_at'])
 
 
-for day in range(2):
-    prior_day=last_date-timedelta(days=day)
-    if tweet_date[day][0]==prior_day:
-        print tweet_date[day]
+days_diff=(tweets[0]['created_at']-tweets[-1]['created_at']).days
+last_day=tweets[-1]['created_at'].date()
+
+for day in range(days_diff.days):
+    tdays=[]
+    last_day-=timedelta(1)
+    for tweet in tweets:
+        if tweet['created_at'].date()==last_day:
+            tdays.append(tweet['created_at']).time()
+            td=[tdays[0],tdays[-1]]
+    if td:
+        dct[last_day]=td
+        
+        
+def strip(date):
+    return datetime.strptime(date,'%a %b %d %H:%M:%S +0000 %Y')
