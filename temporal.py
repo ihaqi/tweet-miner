@@ -13,7 +13,8 @@ from functools import partial
 import pymongo
 from datetime import datetime, timedelta
 
-
+import numpy as np
+import pandas as pd
 
 
 def make_twitter_request(twitter_api_func, max_errors=3, *args, **kw): 
@@ -123,7 +124,7 @@ def harvest_user_timeline(twitter_api,screen_name=None,user_id=None, max_results
 	kw={ #keyword args for the Twitter API call
 	'count':200,
 	'trim_user': 'true',
-	'include_rts':'false',
+	'include_rts':'true',
 	'since_id':1	}
 
 	if screen_name:
@@ -158,26 +159,31 @@ def harvest_user_timeline(twitter_api,screen_name=None,user_id=None, max_results
 
 	return results[:max_results]
 
+def strip(date):
+    return datetime.strptime(date,'%a %b %d %H:%M:%S +0000 %Y')
+
 twitter_api=oauth_login()
-tweets =harvest_user_timeline(twitter_api, screen_name='ma3route',max_results=5000)
+tweets =harvest_user_timeline(twitter_api, screen_name='ma3route',max_results=2000)
 
 for tweet in tweets:
     tweet['created_at']=strip(tweet['created_at'])
 
 
 days_diff=(tweets[0]['created_at']-tweets[-1]['created_at']).days
-last_day=tweets[-1]['created_at'].date()
+last_day=tweets[0]['created_at'].date()
+dct={}
 
-for day in range(days_diff.days):
+for day in range(days_diff):
     tdays=[]
+    td=[]
     last_day-=timedelta(1)
     for tweet in tweets:
         if tweet['created_at'].date()==last_day:
-            tdays.append(tweet['created_at']).time()
-            td=[tdays[0],tdays[-1]]
+            tdays.append(tweet['created_at'])
+            x=((tdays[0]-tdays[-1]).seconds)/3600.0
+            td=[x]
+
     if td:
-        dct[last_day]=td
+            dct[last_day]=td
         
         
-def strip(date):
-    return datetime.strptime(date,'%a %b %d %H:%M:%S +0000 %Y')
