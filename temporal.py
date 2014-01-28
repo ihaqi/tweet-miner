@@ -162,28 +162,43 @@ def harvest_user_timeline(twitter_api,screen_name=None,user_id=None, max_results
 def strip(date):
     return datetime.strptime(date,'%a %b %d %H:%M:%S +0000 %Y')
 
-twitter_api=oauth_login()
-tweets =harvest_user_timeline(twitter_api, screen_name='ma3route',max_results=2000)
+def tweets_dict(tweets):
 
-for tweet in tweets:
-    tweet['created_at']=strip(tweet['created_at'])
-
-
-days_diff=(tweets[0]['created_at']-tweets[-1]['created_at']).days
-last_day=tweets[0]['created_at'].date()
-dct={}
-
-for day in range(days_diff):
-    tdays=[]
-    td=[]
-    last_day-=timedelta(1)
     for tweet in tweets:
-        if tweet['created_at'].date()==last_day:
-            tdays.append(tweet['created_at'])
-            x=((tdays[0]-tdays[-1]).seconds)/3600.0
-            td=[x]
+        tweet['created_at']=strip(tweet['created_at'])
+    
+    
+    days_diff=(tweets[0]['created_at']-tweets[-1]['created_at']).days
+    last_day=tweets[0]['created_at'].date()
+    dct={}
+    week= {0:'Sunday',1:'Monday', 2:'Tuesday', 3:'Wednesday', 4:'Thursday',  5:'Friday', 6:'Saturday'}      
+    
+    for day in range(days_diff):
+        tdays=[]
+        td=[]
+        last_day-=timedelta(1)
+        hsht={}
+        for tweet in tweets:
+            if tweet['created_at'].date()==last_day:
+                tdays.append(tweet['created_at']) #all tweets of the day
+                x=((tdays[0]-tdays[-1]).seconds)/3600.0 #last tweet-first tweet of the day
+                td=[round(x,1),len(tdays)] #time spent online, no of tweets
+                
+                if tweet['entities']['hashtags']:                
+                    for hashtag in tweet['entities']['hashtags']:
+                        if hashtag['text'] in hsht:
+                            hsht[hashtag['text']]+=1
+                        else:
+                            hsht[hashtag['text']]=1
+                td.append(hsht) #add day's hashtags
+            
+        if td:
+                #last_day=str(last_day)
+                dct[last_day.strftime('%d/%m/%Y')]=[week[last_day.weekday()],td]
+        
+    return dct
 
-    if td:
-            dct[last_day]=td
-        
-        
+
+twitter_api=oauth_login()
+tweets =harvest_user_timeline(twitter_api, screen_name='winmitch',max_results=200)
+twt_dct=tweets_dict(tweets=tweets)
