@@ -200,5 +200,5 @@ def tweets_dict(tweets):
 
 
 twitter_api=oauth_login()
-tweets =harvest_user_timeline(twitter_api, screen_name='winmitch',max_results=200)
+tweets =harvest_user_timeline(twitter_api, screen_name='',max_results=200)
 twt_dct=tweets_dict(tweets=tweets)
