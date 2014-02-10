@@ -162,6 +162,13 @@ def harvest_user_timeline(twitter_api,screen_name=None,user_id=None, max_results
 def strip(date):
     return datetime.strptime(date,'%a %b %d %H:%M:%S +0000 %Y')
 
+def get_user_retweets(tweets):
+    user_retweets=0
+    for tweet in tweets:
+        if tweet.has_key('retweeted_status'):
+            user_retweets+=1
+    return user_retweets
+
 def tweets_dict(tweets):
 
     for tweet in tweets:
@@ -178,27 +185,82 @@ def tweets_dict(tweets):
         td=[]
         last_day-=timedelta(1)
         hsht={}
+        replies={}
+        attrs={}
         for tweet in tweets:
             if tweet['created_at'].date()==last_day:
                 tdays.append(tweet['created_at']) #all tweets of the day
                 x=((tdays[0]-tdays[-1]).seconds)/3600.0 #last tweet-first tweet of the day
                 td=[round(x,1),len(tdays)] #time spent online, no of tweets
+                attrs['time']=td[0]
+                attrs['number_of_tweets']=td[1]
                 
                 if tweet['entities']['hashtags']:                
                     for hashtag in tweet['entities']['hashtags']:
                         if hashtag['text'] in hsht:
-                            hsht[hashtag['text']]+=1
+                            hsht[hashtag['text'].encode('utf-8')]+=1
                         else:
-                            hsht[hashtag['text']]=1
+                            hsht[hashtag['text'].encode('utf-8')]=1
                 td.append(hsht) #add day's hashtags
+                attrs['hashtags']=hsht
+                
+                reply=tweet['in_reply_to_screen_name']
+                
+                if reply:                
+                    #for reply in tweet['in_reply_to_screen_name']:
+                        if reply in replies:
+                            replies[reply.encode('utf-8')]+=1
+                        else:
+                            replies[reply.encode('utf-8')]=1
+                td.append(replies) #add day's replies
+                attrs['replies']=replies
             
         if td:
                 #last_day=str(last_day)
-                dct[last_day.strftime('%d/%m/%Y')]=[week[last_day.weekday()],td]
+                attrs['day']=week[last_day.weekday()]
+                #dct[last_day.strftime('%d/%m/%Y')]=[week[last_day.weekday()],td]
+                dct[last_day.strftime('%d/%m/%Y')]=attrs
         
     return dct
 
 
+def get_screen_names(tweets):
+    screen_names=[user_mention['screen_name'] 
+                    for status in tweets
+                        for user_mention in status['entities']['user_mentions']]
+    
+    return len(set(screen_names))
+    
+def get_hashtags(tweets):
+    hashtags=[hashtag['text']
+                for tweet in tweets
+                    for hashtag in tweet['entities']['hashtags']]
+    
+    return len(set(hashtags))
+
+def get_urls(tweets):
+    urls=[url['expanded_url']
+            for tweet in tweets
+                for url in tweet['entities']['urls']]
+                
+    return len(set(urls))
+
+def get_symbols(tweets):
+    symbols=[symbol['text']
+                for tweet in tweets
+                    for symbol in tweet['entities']['symbols']]
+    
+    return len(set(symbols))
+    
+def get_media(tweets):
+    media=[]
+    for tweet in tweets:
+        if tweet['entities'].has_key('media'):
+            media.append(tweet['entities']['media'][0]['url'])
+    
+  
+    return len(set(media))          
+
 twitter_api=oauth_login()
-tweets =harvest_user_timeline(twitter_api, screen_name='',max_results=200)
+tweets =harvest_user_timeline(twitter_api, screen_name='',max_results=3200)
 twt_dct=tweets_dict(tweets=tweets)
