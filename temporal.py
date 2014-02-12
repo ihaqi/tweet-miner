@@ -16,6 +16,8 @@ from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
 
+tweet_rate=3600
+abs_index=0
 
 def make_twitter_request(twitter_api_func, max_errors=3, *args, **kw): 
     
@@ -224,7 +226,7 @@ def tweets_dict(tweets):
     return dct
 
 
-def get_screen_names(tweets):
+def get_user_mentions(tweets):
     screen_names=[user_mention['screen_name'] 
                     for status in tweets
                         for user_mention in status['entities']['user_mentions']]
@@ -259,7 +261,36 @@ def get_media(tweets):
             media.append(tweet['entities']['media'][0]['url'])
     
   
-    return len(set(media))          
+    return len(set(media))
+
+def create_matrix(tweets):
+    hashtags=get_hashtags(tweets)
+    media=get_media(tweets)
+    urls=get_urls(tweets)
+    symbols=get_symbols(tweets)
+    mentions=get_user_mentions(tweets)
+    retweets=get_user_retweets(tweets)
+    total_tweets=len(tweets)
+    matrix=[hashtags,media,urls,symbols,retweets,mentions,total_tweets]
+    
+    
+    return matrix
+
+          
+#def get_matrix(tweets):
+    for i in range(len(tweets)-1):
+        time_diff=(tweets[i+1]['created_at']-tweets[i]['created_at']).seconds
+        if time_diff>(2*tweet_rate):
+            initial_matrix=create_matrix(tweets[:i])
+            if abs_index==0:
+                abs_index=time_diff
+            else:
+                abs_index=(abs_index+time_diff)/2
+            break
+        else:
+            tweet_rate=(tweet_rate+time_diff)/2
+            
+                
 
 twitter_api=oauth_login()
 tweets =harvest_user_timeline(twitter_api, screen_name='',max_results=3200)
