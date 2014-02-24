@@ -3,6 +3,7 @@ import a ton of stuff
 
 '''
 from login import *
+from classifier import *
 from urllib2 import URLError
 from  httplib import BadStatusLine
 import twitter
@@ -16,8 +17,7 @@ from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
 
-tweet_rate=3600
-abs_index=0
+
 
 def make_twitter_request(twitter_api_func, max_errors=3, *args, **kw): 
     
@@ -171,59 +171,6 @@ def get_user_retweets(tweets):
             user_retweets+=1
     return user_retweets
 
-def tweets_dict(tweets):
-
-    for tweet in tweets:
-        tweet['created_at']=strip(tweet['created_at'])
-    
-    
-    days_diff=(tweets[0]['created_at']-tweets[-1]['created_at']).days
-    last_day=tweets[0]['created_at'].date()
-    dct={}
-    week= {0:'Sunday',1:'Monday', 2:'Tuesday', 3:'Wednesday', 4:'Thursday',  5:'Friday', 6:'Saturday'}      
-    
-    for day in range(days_diff):
-        tdays=[]
-        td=[]
-        last_day-=timedelta(1)
-        hsht={}
-        replies={}
-        attrs={}
-        for tweet in tweets:
-            if tweet['created_at'].date()==last_day:
-                tdays.append(tweet['created_at']) #all tweets of the day
-                x=((tdays[0]-tdays[-1]).seconds)/3600.0 #last tweet-first tweet of the day
-                td=[round(x,1),len(tdays)] #time spent online, no of tweets
-                attrs['time']=td[0]
-                attrs['number_of_tweets']=td[1]
-                
-                if tweet['entities']['hashtags']:                
-                    for hashtag in tweet['entities']['hashtags']:
-                        if hashtag['text'] in hsht:
-                            hsht[hashtag['text'].encode('utf-8')]+=1
-                        else:
-                            hsht[hashtag['text'].encode('utf-8')]=1
-                td.append(hsht) #add day's hashtags
-                attrs['hashtags']=hsht
-                
-                reply=tweet['in_reply_to_screen_name']
-                
-                if reply:                
-                    #for reply in tweet['in_reply_to_screen_name']:
-                        if reply in replies:
-                            replies[reply.encode('utf-8')]+=1
-                        else:
-                            replies[reply.encode('utf-8')]=1
-                td.append(replies) #add day's replies
-                attrs['replies']=replies
-            
-        if td:
-                #last_day=str(last_day)
-                attrs['day']=week[last_day.weekday()]
-                #dct[last_day.strftime('%d/%m/%Y')]=[week[last_day.weekday()],td]
-                dct[last_day.strftime('%d/%m/%Y')]=attrs
-        
-    return dct
 
 
 def get_user_mentions(tweets):
@@ -271,27 +218,82 @@ def create_matrix(tweets):
     mentions=get_user_mentions(tweets)
     retweets=get_user_retweets(tweets)
     total_tweets=len(tweets)
-    matrix=[hashtags,media,urls,symbols,retweets,mentions,total_tweets]
+    test_data = get_test_tweets(tweets)
+    test_labels = label_data(test_data, positive_word_prob, negative_word_prob, positive_prob, negative_prob)
+    #print test_labels
+    pos=test_labels[0]
+    neg=test_labels[1]
+    matrix=[pos,neg,hashtags,media,urls,symbols,retweets,mentions,total_tweets]
     
     
     return matrix
 
-          
+def create_dataframe(init,fin,labels,timestamp):
+     df=pd.DataFrame(data={'init':init,'fin':fin},columns=['init','fin'],index=labels)
+     df.columns.name=timestamp
+     return df
 #def get_matrix(tweets):
-    for i in range(len(tweets)-1):
-        time_diff=(tweets[i+1]['created_at']-tweets[i]['created_at']).seconds
+
+if __name__=="__main__":
+    tweet_rate=3600
+    abs_index=0                
+    twitter_api=oauth_login()
+    tweets =harvest_user_timeline(twitter_api, screen_name='winmitch',max_results=400)
+    tweets.reverse()
+    labels=['positive','negaitve','hashtags','media','urls','symbols','retweets','mentions','total_tweets']
+    #twt_dct=tweets_dict(tweets=tweets)
+    for tweet in tweets:
+        tweet['created_at']=strip(tweet['created_at'])
+        
+    training_data = get_training_data()
+    
+   
+    word_prob = get_word_prob(training_data)
+    positive_word_prob = get_word_prob(training_data, 'positive')
+    negative_word_prob = get_word_prob(training_data, 'negative')
+
+    # Get the probability of each label
+    positive_prob = get_label_prob(training_data, 'positive')
+    negative_prob = get_label_prob(training_data, 'negative')
+
+    # Normalise for stop words
+    for (word, prob) in word_prob.iteritems():
+        positive_word_prob[word] /= prob
+        negative_word_prob[word] /= prob
+    i=0
+    j=0
+    final_matrix=None
+    #k=0
+    while i < (len(tweets)-2):
+        i+=1
+        #print i
+        time_diff=(tweets[i]['created_at']-tweets[i-1]['created_at']).total_seconds()
+        #print i,time_diff, tweets[i]['created_at']
         if time_diff>(2*tweet_rate):
-            initial_matrix=create_matrix(tweets[:i])
+            
+            if final_matrix == None:
+                initial_matrix=create_matrix([])
+                #print initial_matrix
+                final_matrix=create_matrix(tweets[j:i])
+                #print final_matrix
+                df=create_dataframe(initial_matrix,final_matrix,labels,tweets[i]['created_at'])
+                print df
+                j=i
+                #print j
+            else:
+                #print i, time_diff
+                initial_matrix=final_matrix
+                final_matrix=create_matrix(tweets[j:i])
+                #print i,j,initial_matrix,final_matrix,abs_index,tweet_rate
+                j=i
             if abs_index==0:
                 abs_index=time_diff
+                #print abs_index
             else:
                 abs_index=(abs_index+time_diff)/2
-            break
+                #print abs_index
+            
         else:
             tweet_rate=(tweet_rate+time_diff)/2
-            
+            #print abs_index, tweet_rate
                 
-
-twitter_api=oauth_login()
-tweets =harvest_user_timeline(twitter_api, screen_name='',max_results=3200)
-twt_dct=tweets_dict(tweets=tweets)
