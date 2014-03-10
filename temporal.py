@@ -11,12 +11,11 @@ import json
 import sys
 from sys import maxint
 from functools import partial
-import pymongo
 from datetime import datetime, timedelta
 
-import numpy as np
 import pandas as pd
-
+import csv
+import numpy as np
 
 
 def make_twitter_request(twitter_api_func, max_errors=3, *args, **kw): 
@@ -77,45 +76,6 @@ def make_twitter_request(twitter_api_func, max_errors=3, *args, **kw):
             if error_count > max_errors:
                 print >> sys.stderr, "Too many consecutive errors...bailing out."
                 raise e
-
-
-
-        
-
-
-def get_friends_or_followers_ids(twitter_api,screen_name=None,user_id=None, friends_limit=maxint, followers_limit=maxint):
-	 #must have either screen_name or user_id (logical xor)
-
-	 assert (screen_name != None) != (user_id != None)
-	 "Must have screen_name or user_id but not both"
-
-	 get_friends_ids=partial(make_twitter_request,twitter_api.friends.ids,count=5000)
-	 get_followers_ids=partial(make_twitter_request,twitter_api.followers.ids,count=5000)
-
-	 friends_ids,followers_ids=[],[]
-
-	 for twitter_api_func, limit, ids, label in [[get_friends_ids,friends_limit,friends_ids,"friends"], [get_followers_ids, followers_limit,followers_ids,"followers"]]:
-	     if limit ==0:
-	         continue
-
-	 cursor=-1
-
-	 while cursor != 0:
-	 	if screen_name:
-	 		response=twitter_api_func(screen_name=screen_name,cursor=cursor)
-	 	else:
-	 		response=twitter_api_func(user_id=user_id,cursor=cursor)
-
-	 	if response is not None:
-	 		ids+=response['ids']
-	 		cursor=response['next_cursor']
-
-	 	print sys.stderr, 'Fetched {0} total {1} ids for {2}'.format(len(ids),label,(user_id or screen_name))
-
-	 	if len(ids) >= limit or response is None:
-	 		break
-	 return friends_ids[:friends_limit], followers_ids[:followers_limit]
-
 
 
 def harvest_user_timeline(twitter_api,screen_name=None,user_id=None, max_results=1000):
@@ -234,66 +194,97 @@ def create_dataframe(init,fin,labels,timestamp):
      return df
 #def get_matrix(tweets):
 
+def get_avg(tweets):
+    times=[]
+    std=0
+    for i in range(1,len(tweets)):
+        time_diff=(tweets[i]['created_at']-tweets[i-1]['created_at']).total_seconds()
+        times.append(time_diff)
+    #print times
+    avg=sum(times)/len(times)
+    from math import sqrt
+    for a in times:
+        std = std + (a - avg)**2
+    std = sqrt(std / float(len(times)-1))
+
+    print np.std(times), 'stdev', avg ,std
+    return np.std(times)
+
 if __name__=="__main__":
-    tweet_rate=3600
+    uname='barackobama'
     abs_index=0                
     twitter_api=oauth_login()
-    tweets =harvest_user_timeline(twitter_api, screen_name='winmitch',max_results=400)
+    tweets =harvest_user_timeline(twitter_api, screen_name=uname,max_results=200)
     tweets.reverse()
-    labels=['positive','negaitve','hashtags','media','urls','symbols','retweets','mentions','total_tweets']
-    #twt_dct=tweets_dict(tweets=tweets)
-    for tweet in tweets:
-        tweet['created_at']=strip(tweet['created_at'])
+    filname=uname+'.csv'
+    with open(filname,'w') as fil:
+        writer=csv.writer(fil)
         
-    training_data = get_training_data()
-    
-   
-    word_prob = get_word_prob(training_data)
-    positive_word_prob = get_word_prob(training_data, 'positive')
-    negative_word_prob = get_word_prob(training_data, 'negative')
-
-    # Get the probability of each label
-    positive_prob = get_label_prob(training_data, 'positive')
-    negative_prob = get_label_prob(training_data, 'negative')
-
-    # Normalise for stop words
-    for (word, prob) in word_prob.iteritems():
-        positive_word_prob[word] /= prob
-        negative_word_prob[word] /= prob
-    i=0
-    j=0
-    final_matrix=None
-    #k=0
-    while i < (len(tweets)-2):
-        i+=1
-        #print i
-        time_diff=(tweets[i]['created_at']-tweets[i-1]['created_at']).total_seconds()
-        #print i,time_diff, tweets[i]['created_at']
-        if time_diff>(2*tweet_rate):
+        
+        labels=['timestamp','positive','negative','hashtags','media','urls','symbols','retweets','mentions','total_tweets']
+        writer.writerow(labels)
+        #twt_dct=tweets_dict(tweets=tweets)
+        for tweet in tweets:
+            tweet['created_at']=strip(tweet['created_at'])
             
-            if final_matrix == None:
-                initial_matrix=create_matrix([])
-                #print initial_matrix
-                final_matrix=create_matrix(tweets[j:i])
-                #print final_matrix
-                df=create_dataframe(initial_matrix,final_matrix,labels,tweets[i]['created_at'])
-                print df
-                j=i
-                #print j
-            else:
-                #print i, time_diff
-                initial_matrix=final_matrix
-                final_matrix=create_matrix(tweets[j:i])
-                #print i,j,initial_matrix,final_matrix,abs_index,tweet_rate
-                j=i
-            if abs_index==0:
-                abs_index=time_diff
-                #print abs_index
-            else:
-                abs_index=(abs_index+time_diff)/2
-                #print abs_index
-            
-        else:
-            tweet_rate=(tweet_rate+time_diff)/2
-            #print abs_index, tweet_rate
+        tweet_rate=get_avg(tweets)
+
+        training_data = get_training_data()
+        
+       
+        word_prob = get_word_prob(training_data)
+        positive_word_prob = get_word_prob(training_data, 'positive')
+        negative_word_prob = get_word_prob(training_data, 'negative')
+
+        # Get the probability of each label
+        positive_prob = get_label_prob(training_data, 'positive')
+        negative_prob = get_label_prob(training_data, 'negative')
+
+        # Normalise for stop words
+        for (word, prob) in word_prob.iteritems():
+            positive_word_prob[word] /= prob
+            negative_word_prob[word] /= prob
+        i=0
+        j=0
+        final_matrix=None
+        #k=0
+        while i < (len(tweets)-2):
+            i+=1
+            #print i
+            time_diff=(tweets[i]['created_at']-tweets[i-1]['created_at']).total_seconds()
+            #print i,time_diff, tweets[i]['created_at']
+            if time_diff>tweet_rate:
                 
+                if final_matrix == None:
+                    initial_matrix=create_matrix([])
+                    initial_matrix.insert(0,tweets[i]['created_at'])
+                    writer.writerow(initial_matrix)
+                    #print initial_matrix
+                    final_matrix=create_matrix(tweets[j:i])
+                    final_matrix.insert(0,tweets[i]['created_at'])
+                    writer.writerow(final_matrix)
+                    #print final_matrix
+                    #df=create_dataframe(initial_matrix,final_matrix,labels,tweets[i]['created_at'])
+                    #print df
+                    j=i
+                    #print j
+                else:
+                    #print i, time_diff
+                    initial_matrix=final_matrix
+                    final_matrix=create_matrix(tweets[j:i])
+                    final_matrix.insert(0,tweets[i]['created_at'])
+                    writer.writerow(final_matrix)
+                    #print initial_matrix
+                    #print i,j,initial_matrix,final_matrix,abs_index,tweet_rate
+                    j=i
+                if abs_index==0:
+                    abs_index=time_diff
+                    #print abs_index
+                else:
+                    abs_index=(abs_index+time_diff)/2
+                    #print abs_index
+                
+            #else:
+                #tweet_rate=(tweet_rate+time_diff)/2
+                #print abs_index, tweet_rate
+                    
